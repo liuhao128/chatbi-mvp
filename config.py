@@ -1,4 +1,13 @@
+"""
+配置管理模块
+
+集中管理数据库连接和 LLM API 配置，所有环境变量和常量在此统一定义。
+"""
+
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DB_CONFIG = {
     "host": os.getenv("DB_HOST", "localhost"),
@@ -13,6 +22,7 @@ LLM_CONFIG = {
     "api_key": os.getenv("OPENAI_API_KEY"),
     "base_url": os.getenv("OPENAI_BASE_URL", "https://ws-m71z8s6gl9pvodik.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"),
     "model": os.getenv("LLM_MODEL", "qwen3-max"),
+    "embedding_model": os.getenv("EMBEDDING_MODEL", "text-embedding-v3"),
     "temperature": 0.1,
     "max_tokens": 1000
 }
