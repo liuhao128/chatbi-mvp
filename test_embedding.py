@@ -9,6 +9,7 @@ emb = OpenAIEmbeddings(
     base_url=LLM_CONFIG["base_url"],
     model=LLM_CONFIG["embedding_model"],
     check_embedding_ctx_length=False,
+    chunk_size=10,
 )
 
 print(emb.embed_query("你好"))
