@@ -228,7 +228,11 @@ def health_check() -> HealthResponse:
     summary="同步查询（一次性返回）",
     responses={
         400: {"model": ErrorResponse, "description": "输入问题不合法"},
+        403: {"model": ErrorResponse, "description": "权限不足或安全策略拒绝"},
+        422: {"model": ErrorResponse, "description": "生成的 SQL 无法执行"},
         502: {"model": ErrorResponse, "description": "LLM 调用失败"},
+        503: {"model": ErrorResponse, "description": "数据库连接异常"},
+        504: {"model": ErrorResponse, "description": "数据库查询超时"},
         500: {"model": ErrorResponse, "description": "数据库或服务内部异常"},
     },
 )
@@ -260,6 +264,12 @@ def query_chatbi(payload: QueryRequest, request: Request) -> QuerySuccessRespons
             status_code = 502
         elif error_type == "security":
             status_code = 403
+        elif error_type == "database_sql_syntax":
+            status_code = 422
+        elif error_type == "database_connection_error":
+            status_code = 503
+        elif error_type == "database_query_timeout":
+            status_code = 504
         raise HTTPException(status_code=status_code, detail=result["error"])
 
     metadata = {

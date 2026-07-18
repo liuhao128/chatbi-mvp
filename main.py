@@ -20,7 +20,7 @@ from decimal import Decimal
 from typing import Generator
 
 from config import LLM_CONFIG
-from database import DatabaseClient
+from database import DatabaseClient, QueryExecutionError
 from indicator_knowledge import IndicatorKnowledge
 from llm_client import LLMClient
 from prompt_builder import build_prompt
@@ -150,6 +150,7 @@ class ChatBISystem:
         # 5. 执行 SQL
         try:
             columns, results = self.db.execute(sql, user=user_context)
+            db_info = getattr(self.db, "last_query_info", {})
             formatted = self.formatter.format(columns, results)
             return {
                 "success": True,
@@ -169,6 +170,9 @@ class ChatBISystem:
                     "security_role": user_context.role,
                     "security_region": user_context.region,
                     "row_count": len(results),
+                    "db_duration_ms": db_info.get("duration_ms"),
+                    "db_slow_query": db_info.get("slow_query", False),
+                    "db_explain_plan": db_info.get("explain_plan", []),
                 }
             }
         except SecurityError as e:
@@ -188,6 +192,28 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "security_role": user_context.role,
                     "security_region": user_context.region,
+                }
+            }
+        except QueryExecutionError as e:
+            return {
+                "success": False,
+                "sql": sql,
+                "error": str(e),
+                "error_type": f"database_{e.error_type}",
+                "metadata": {
+                    "detected_indicators": detected_indicators,
+                    "model": LLM_CONFIG["model"],
+                    "used_few_shot": use_few_shot,
+                    "used_rules": use_rules,
+                    "used_guards": use_guards,
+                    "used_indicator_knowledge": use_indicator_knowledge,
+                    "used_schema_linking": use_schema_linking,
+                    "used_indicator_rag": use_indicator_rag,
+                    "security_role": user_context.role,
+                    "security_region": user_context.region,
+                    "db_duration_ms": e.metadata.get("duration_ms"),
+                    "db_error_code": e.metadata.get("error_code"),
+                    "db_raw_error": e.metadata.get("raw_error"),
                 }
             }
         except Exception as e:
@@ -307,6 +333,7 @@ class ChatBISystem:
         # 6. 执行 SQL
         try:
             columns, results = self.db.execute(sql, user=user_context)
+            db_info = getattr(self.db, "last_query_info", {})
             rows_dict = [dict(zip(columns, row)) for row in results]
             yield _sse_event("result", {
                 "columns": columns,
@@ -323,6 +350,9 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "security_role": user_context.role,
                     "security_region": user_context.region,
+                    "db_duration_ms": db_info.get("duration_ms"),
+                    "db_slow_query": db_info.get("slow_query", False),
+                    "db_explain_plan": db_info.get("explain_plan", []),
                 }
             })
         except SecurityError as e:
@@ -338,6 +368,24 @@ class ChatBISystem:
                     "used_indicator_rag": use_indicator_rag,
                     "security_role": user_context.role,
                     "security_region": user_context.region,
+                }
+            })
+        except QueryExecutionError as e:
+            yield _sse_event("error", {
+                "error": str(e),
+                "error_type": f"database_{e.error_type}",
+                "sql": sql,
+                "metadata": {
+                    "detected_indicators": detected_indicators,
+                    "model": LLM_CONFIG["model"],
+                    "used_indicator_knowledge": use_indicator_knowledge,
+                    "used_schema_linking": use_schema_linking,
+                    "used_indicator_rag": use_indicator_rag,
+                    "security_role": user_context.role,
+                    "security_region": user_context.region,
+                    "db_duration_ms": e.metadata.get("duration_ms"),
+                    "db_error_code": e.metadata.get("error_code"),
+                    "db_raw_error": e.metadata.get("raw_error"),
                 }
             })
         except Exception as e:
